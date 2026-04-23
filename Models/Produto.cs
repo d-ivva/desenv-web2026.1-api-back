@@ -1,45 +1,54 @@
 // Models/Produto.cs
 
 namespace DesenvWebApi.Models;
-
-// A classe Produto representa a tabela "Produtos" no banco de dados.
-// O Entity Framework usa esta classe para:
-//   1. Criar a tabela via Migration
-//   2. Ler e escrever dados na tabela
-//   3. Mapear resultados de queries para objetos C#
-//
-// Convenção de nomenclatura do EF:
-//   - O nome da tabela no banco será o nome da classe no plural: "Produtos"
-//   - A propriedade "Id" é automaticamente reconhecida como chave primária
+// Models/Produto.cs — versão atualizada com relacionamento 1-para-N
 public class Produto
 {
-    // Chave primária — identificador único do produto.
-    // O EF reconhece "Id" automaticamente como PK.
-    // No banco: coluna "Id" INTEGER PRIMARY KEY AUTOINCREMENT
     public int Id { get; set; }
-
-    // Nome do produto — campo obrigatório.
-    // "required" garante que o C# não permite criar um Produto sem Nome.
-    // No banco: coluna "Nome" TEXT NOT NULL
     public required string Nome { get; set; }
-
-    // Descrição do produto — campo opcional.
-    // "?" indica que a propriedade pode ser nula (nullable).
-    // No banco: coluna "Descricao" TEXT NULL
     public string? Descricao { get; set; }
-
-    // Preço do produto.
-    // "decimal" é o tipo C# para valores monetários — evita erros de ponto flutuante.
-    // No banco: coluna "Preco" NUMERIC
     public decimal Preco { get; set; }
-
-    // Quantidade em estoque.
-    // No banco: coluna "Quantidade" INTEGER
     public int Quantidade { get; set; }
-
-    // Data e hora de criação do produto.
-    // Inicializado automaticamente com a data/hora atual em UTC.
-    // UTC (Coordinated Universal Time) é o padrão para armazenar datas em bancos.
-    // No banco: coluna "DataCriacao" TIMESTAMP WITH TIME ZONE
     public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
+
+    // =====================================================================
+    // CHAVE ESTRANGEIRA — lado "muitos" do relacionamento
+    //
+    // CategoriaId é uma chave estrangeira (Foreign Key) que referencia
+    // a tabela Categorias. No banco de dados, o EF vai criar:
+    //   FOREIGN KEY ("CategoriaId") REFERENCES "Categorias"("Id")
+    //
+    // Esta é a COLUNA REAL que será adicionada à tabela Produtos.
+    // Ela armazena apenas o ID da categoria (um número inteiro),
+    // não a categoria inteira.
+    //
+    // Por que "int" e não "int?"?
+    // Porque a categoria é OBRIGATÓRIA para um produto.
+    // Se fosse opcional, usaríamos "int?" (nullable).
+    //
+    // Exemplo: se o produto "Notebook Dell" pertence à categoria
+    // "Eletrônicos" (Id = 1), então CategoriaId = 1.
+    // =====================================================================
+    public int CategoriaId { get; set; }
+
+    // =====================================================================
+    // PROPRIEDADE DE NAVEGAÇÃO — permite acessar o objeto Categoria inteiro
+    //
+    // Esta propriedade NÃO corresponde a uma coluna no banco de dados.
+    // O EF usa o par (CategoriaId + Categoria) para entender o relacionamento.
+    //
+    // Por que "?" (nullable)?
+    // Porque ao criar um Produto pelo código, você pode definir apenas
+    // o CategoriaId (um número) sem carregar o objeto Categoria inteiro.
+    // O EF só preenche esta propriedade quando você usa .Include() na query.
+    //
+    // Sem .Include(): produto.Categoria é null
+    // Com .Include(): produto.Categoria é o objeto completo { Id, Nome, ... }
+    //
+    // Isso é chamado de Lazy vs Eager Loading (veremos em detalhes mais adiante).
+    //
+    // Uso: produto.Categoria.Nome, produto.Categoria.Id, etc.
+    // (só disponível após .Include() na query)
+    // =====================================================================
+    public Categoria? Categoria { get; set; }
 }
