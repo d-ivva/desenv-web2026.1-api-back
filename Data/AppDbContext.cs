@@ -7,80 +7,78 @@ using DesenvWebApi.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace DesenvWebApi.Data;
-
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
 
-    // DbSet existente — tabela "Produtos"
     public DbSet<Produto> Produtos { get; set; }
-
-    // =====================================================================
-    // NOVO: DbSet para Categorias
-    //
-    // Ao adicionar este DbSet, estamos dizendo ao EF:
-    // "Existe uma tabela chamada 'Categorias' no banco de dados,
-    //  e cada linha dessa tabela corresponde a um objeto Categoria."
-    //
-    // A partir de agora, podemos usar:
-    //   _context.Categorias.ToListAsync()     → SELECT * FROM "Categorias"
-    //   _context.Categorias.FindAsync(id)     → SELECT * WHERE Id = @id
-    //   _context.Categorias.Add(categoria)    → prepara INSERT
-    // =====================================================================
     public DbSet<Categoria> Categorias { get; set; }
 
     // =====================================================================
-    // OnModelCreating — configuração avançada do modelo
+    // NOVO: DbSet para DetalheProduto
     //
-    // Este método é chamado pelo EF quando ele está "montando" o modelo
-    // do banco de dados. Aqui usamos a Fluent API para configurar
-    // relacionamentos, restrições e comportamentos.
-    //
-    // Fluent API vs Data Annotations:
-    // - Data Annotations: [Required], [MaxLength(100)], [ForeignKey("...")]
-    //   São atributos colocados diretamente nas propriedades do model.
-    //
-    // - Fluent API: configuração feita aqui no OnModelCreating.
-    //   É mais poderosa e permite configurações que Data Annotations não suportam.
-    //
-    // Neste curso, usamos Fluent API para deixar os relacionamentos
-    // explícitos e fáceis de entender em um único lugar.
+    // O EF vai criar (ou verificar) uma tabela "DetalhesProduto" no banco.
+    // Note o nome no plural: a convenção do DbSet define o nome da tabela.
     // =====================================================================
+    public DbSet<DetalheProduto> DetalhesProduto { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // =================================================================
-        // CONFIGURAÇÃO DO RELACIONAMENTO 1-PARA-N: Produto → Categoria
-        //
-        // Leia da seguinte forma, de cima para baixo:
-        //   "Um Produto TEM UMA Categoria"
-        //   "Uma Categoria TEM MUITOS Produtos"
-        //   "A chave estrangeira é CategoriaId"
-        //   "Se a Categoria for deletada, RESTRINJA (não permita)"
+        // RELACIONAMENTO 1-PARA-N: Produto → Categoria (do módulo anterior)
         // =================================================================
         modelBuilder.Entity<Produto>()
-            // Um Produto tem uma Categoria (propriedade de navegação)
             .HasOne(p => p.Categoria)
-            // Uma Categoria tem muitos Produtos (navegação inversa)
             .WithMany(c => c.Produtos)
-            // A chave estrangeira na tabela Produtos é CategoriaId
             .HasForeignKey(p => p.CategoriaId)
-            // Comportamento ao deletar: O que acontece com os Produtos
-            // quando a Categoria deles é deletada?
-            //
-            // Restrict  = PROÍBE deletar a categoria se tiver produtos.
-            //             O banco lança um erro. É a opção mais segura.
-            //
-            // Cascade   = Deleta todos os produtos junto com a categoria.
-            //             Perigoso! Uma deleção pode remover muitos dados.
-            //
-            // SetNull   = Define CategoriaId como NULL nos produtos órfãos.
-            //             Só funciona se CategoriaId for nullable (int?).
-            //
-            // Escolhemos Restrict porque é mais seguro para um sistema real:
-            // o usuário deve primeiro remover ou reatribuir os produtos
-            // antes de deletar uma categoria.
             .OnDelete(DeleteBehavior.Restrict);
+
+        // =================================================================
+        // RELACIONAMENTO 1-PARA-1: Produto → DetalheProduto (NOVO)
+        //
+        // Leia da seguinte forma:
+        //   "Um DetalheProduto TEM UM Produto"
+        //   "Um Produto TEM NO MÁXIMO UM DetalheProduto"
+        //   "A chave estrangeira está em DetalheProduto (ProdutoId)"
+        //   "Se o Produto for deletado, o DetalheProduto também é deletado"
+        // =================================================================
+        modelBuilder.Entity<DetalheProduto>()
+            // Um DetalheProduto tem um Produto (navegação)
+            .HasOne(d => d.Produto)
+            // Um Produto pode ter no máximo um DetalheProduto (navegação inversa)
+            // Note: WithOne (não WithMany!) — essa é a diferença para 1-para-N
+            .WithOne(p => p.DetalheProduto)
+            // A chave estrangeira está na tabela DetalheProduto.
+            // <DetalheProduto> é necessário para o EF saber em qual tabela
+            // está a FK (ambiguidade: a FK poderia estar em qualquer lado).
+            .HasForeignKey<DetalheProduto>(d => d.ProdutoId)
+            // Se o Produto for deletado, o DetalheProduto é deletado junto.
+            //
+            // Usamos Cascade aqui (diferente do Restrict na Categoria) porque:
+            //   - Um DetalheProduto sem Produto não faz sentido
+            //   - É seguro: deletar 1 detalhe não é perigoso como deletar N produtos
+            //   - É prático: o usuário não precisa deletar o detalhe manualmente
+            //     antes de deletar o produto
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // =================================================================
+        // RESTRIÇÃO UNIQUE em ProdutoId
+        //
+        // ESTA É A LINHA QUE GARANTE O 1-PARA-1!
+        //
+        // Sem ela, o banco permitiria múltiplos DetalheProduto com o mesmo
+        // ProdutoId — e o relacionamento seria 1-para-N.
+        //
+        // Com o índice UNIQUE, qualquer tentativa de INSERT com um ProdutoId
+        // que já existe na tabela será rejeitada pelo banco:
+        //   "23505: duplicate key value violates unique constraint"
+        //
+        // Índice UNIQUE também melhora a performance de buscas por ProdutoId.
+        // =================================================================
+        modelBuilder.Entity<DetalheProduto>()
+            .HasIndex(d => d.ProdutoId)
+            .IsUnique();
     }
 }

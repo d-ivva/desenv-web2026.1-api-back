@@ -74,17 +74,12 @@ public class ProdutosController : ControllerBase
     // e passado como parâmetro para o método.
     // Exemplo: GET /api/produtos/3 → id = 3
     // =====================================================================
-    [HttpGet("{id}")]
+  [HttpGet("{id}")]
     public async Task<ActionResult<Produto>> GetProduto(int id)
     {
-        // Note que aqui usamos FirstOrDefaultAsync em vez de FindAsync.
-        // FindAsync não suporta .Include() — ele busca diretamente pelo PK
-        // sem possibilidade de incluir relacionamentos.
-        //
-        // FirstOrDefaultAsync permite encadear .Include() e .Where()
-        // antes de executar a query.
         var produto = await _context.Produtos
             .Include(p => p.Categoria)
+            .Include(p => p.DetalheProduto)  // ← NOVO: carrega o detalhe junto
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (produto == null)
