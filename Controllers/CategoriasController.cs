@@ -5,8 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using DesenvWebApi.Data;
 using DesenvWebApi.Models;
 
-namespace MeuCrud.Api.Controllers;
-
 // [ApiController] habilita comportamentos automáticos:
 //   - Validação automática do ModelState
 //   - Inferência de [FromBody] para parâmetros complexos
